@@ -3,41 +3,40 @@ const mysql = require('mysql');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
 const BD = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'NavarroG240102', // Cambia por tu contraseña real
-  database: 'caminante',
+  host: 'srv1960.hstgr.io',
+  user: 'u543028883_user_caminante',
+  password: 'Cam1nante2024!',
+  database: 'u543028883_caminante_db',
 });
 
 BD.connect((err) => {
-  if (err) throw err;
-  console.log('Conexión exitosa a MySQL');
+  if (err) {
+    console.error('❌ Error de conexión:', err);
+  } else {
+    console.log('✅ Conectado a MySQL en Hostinger');
+  }
 });
 
-// Ruta GET de prueba
+
 app.get('/api/productos', (req, res) => {
-  const SQL_QUERY = 'SELECT * FROM productos';
-  BD.query(SQL_QUERY, (err, result) => {
-    if (err) throw err;
+  BD.query('SELECT * FROM productos', (err, result) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al consultar productos' });
     res.json(result);
   });
 });
 
-// Ruta POST para login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ mensaje: 'Faltan datos' });
-  }
+  if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
 
-  const SQL_QUERY = 'SELECT * FROM usuarios WHERE correo = ? AND contrasena = ?';
-  BD.query(SQL_QUERY, [email, password], (err, result) => {
+  const sql = 'SELECT * FROM usuarios WHERE correo = ? AND contrasena = ?';
+  BD.query(sql, [email, password], (err, result) => {
     if (err) return res.status(500).json({ mensaje: 'Error interno' });
 
     if (result.length > 0) {
@@ -51,17 +50,11 @@ app.post('/api/login', (req, res) => {
 app.post('/api/registro', (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
-  }
+  if (!email || !password) return res.status(400).json({ mensaje: 'Todos los campos son obligatorios' });
 
-  const sql = 'INSERT INTO usuarios (correo, contrasena) VALUES (?, ?)';
-
-  BD.query(sql, [email, password], (err, result) => {
+  BD.query('INSERT INTO usuarios (correo, contrasena) VALUES (?, ?)', [email, password], (err, result) => {
     if (err) {
-      if (err.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({ mensaje: 'Correo ya registrado' });
-      }
+      if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ mensaje: 'Correo ya registrado' });
       return res.status(500).json({ mensaje: 'Error interno del servidor' });
     }
 
@@ -69,8 +62,6 @@ app.post('/api/registro', (req, res) => {
   });
 });
 
-
-// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`Servidor iniciado en http://localhost:${PORT}`);
+  console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
 });

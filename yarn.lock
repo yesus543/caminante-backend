@@ -10,6 +10,11 @@ accepts@^2.0.0:
     mime-types "^3.0.0"
     negotiator "^1.0.0"
 
+bcryptjs@^3.0.2:
+  version "3.0.2"
+  resolved "https://registry.npmjs.org/bcryptjs/-/bcryptjs-3.0.2.tgz"
+  integrity sha512-k38b3XOZKv60C4E2hVsXTolJWfkGRMbILBIe2IBITXciy5bOsTKot5kDrf3ZfufQtQOUN5mXceUEpU1rTl9Uog==
+
 bignumber.js@9.0.0:
   version "9.0.0"
   resolved "https://registry.npmjs.org/bignumber.js/-/bignumber.js-9.0.0.tgz"
@@ -72,11 +77,6 @@ cookie@^0.7.1:
   version "0.7.2"
   resolved "https://registry.npmjs.org/cookie/-/cookie-0.7.2.tgz"
   integrity sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==
-
-cords@^1.0.4:
-  version "1.0.4"
-  resolved "https://registry.npmjs.org/cords/-/cords-1.0.4.tgz"
-  integrity sha512-7pcUA9L5eBw5+m1skGMfbz40m36S9py21VcQrtK2GWVtKM1qC0n/pNjdFqmPJlKiFPQ2x8RyKoLUfaMe/5O91A==
 
 core-util-is@~1.0.0:
   version "1.0.3"

@@ -56,6 +56,34 @@ app.post('/api/login', (req, res) => {
     }
   );
 });
+// Ruta de registro (solo para usuarios)
+app.post('/api/registroUSER', (req, res) => {
+  const { email, password } = req.body; // Solo necesitamos correo y contraseña
+
+  if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
+
+  // Verificar si el correo ya está registrado
+  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, result) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al verificar el correo' });
+
+    if (result.length > 0) {
+      return res.status(409).json({ mensaje: 'Correo ya registrado' });
+    }
+
+    // Hashear la contraseña antes de guardarla
+    bcrypt.hash(password, 10, (err, hashedPassword) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al procesar la contraseña' });
+
+      // Guardar el nuevo usuario con rol 'usuario'
+      const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
+      BD.query(query, [email, hashedPassword, 'usuario'], (err) => {
+        if (err) return res.status(500).json({ mensaje: 'Error al registrar el usuario' });
+
+        res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
+      });
+    });
+  });
+});
 
 // Ruta de registro
 app.post('/api/registro', (req, res) => {

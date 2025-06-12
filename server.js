@@ -84,6 +84,24 @@ app.post('/api/registroUSER', (req, res) => {
     });
   });
 });
+// Ruta para obtener las rutas disponibles
+app.get('/api/rutas', (req, res) => {
+  // Consulta a la base de datos para obtener las rutas
+  BD.query('SELECT * FROM rutas', (err, result) => {
+    if (err) {
+      console.error('Error al obtener las rutas:', err);
+      return res.status(500).json({ mensaje: 'Error al obtener las rutas' });
+    }
+
+    // Formatear los horarios como un arreglo
+    const rutas = result.map(ruta => ({
+      ...ruta,
+      horarios: JSON.parse(ruta.horarios), // Convertir el campo JSON de horarios a un arreglo
+    }));
+
+    res.json(rutas); // Devolver las rutas como respuesta
+  });
+});
 
 // Ruta de registro
 app.post('/api/registro', (req, res) => {

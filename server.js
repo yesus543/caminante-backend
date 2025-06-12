@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Conexión a la base de datos
 const BD = mysql.createPool({
   connectionLimit: 10,
   host: process.env.DB_HOST,
@@ -17,6 +18,7 @@ const BD = mysql.createPool({
   database: process.env.DB_NAME,
 });
 
+// Verificación de la conexión
 BD.getConnection((err, connection) => {
   if (err) {
     console.error('❌ Error al conectar con MySQL:', err);
@@ -56,6 +58,7 @@ app.post('/api/login', (req, res) => {
     }
   );
 });
+
 // Ruta de registro (solo para usuarios)
 app.post('/api/registroUSER', (req, res) => {
   const { email, password } = req.body; // Solo necesitamos correo y contraseña
@@ -84,6 +87,7 @@ app.post('/api/registroUSER', (req, res) => {
     });
   });
 });
+
 // Ruta para obtener las rutas disponibles
 app.get('/api/rutas', (req, res) => {
   // Consulta a la base de datos para obtener las rutas
@@ -103,62 +107,7 @@ app.get('/api/rutas', (req, res) => {
   });
 });
 
-// Ruta de registro
-app.post('/api/registro', (req, res) => {
-  const { email, password, rol } = req.body;
-  if (!email || !password || !rol) return res.status(400).json({ mensaje: 'Faltan datos' });
-
-  // Validar rol (debe ser 'admin' o 'usuario')
-  if (rol !== 'admin' && rol !== 'usuario') {
-    return res.status(400).json({ mensaje: 'Rol no válido' });
-  }
-
-  BD.query(
-    'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)',
-    [email, password, rol],
-    (err) => {
-      if (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
-          return res.status(409).json({ mensaje: 'Correo ya registrado' });
-        }
-        return res.status(500).json({ mensaje: 'Error al registrar' });
-      }
-      res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
-    }
-  );
-});
-
-// Ruta para registrar un nuevo admin
-app.post('/api/registrar-admin', (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ mensaje: 'Email y contraseña son obligatorios' });
-  }
-
-  // Verificar si el correo ya está registrado
-  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, result) => {
-    if (err) return res.status(500).json({ mensaje: 'Error al verificar el correo' });
-
-    if (result.length > 0) {
-      return res.status(409).json({ mensaje: 'Correo ya registrado' });
-    }
-
-    // Hashear la contraseña antes de guardarla
-    bcrypt.hash(password, 10, (err, hashedPassword) => {
-      if (err) return res.status(500).json({ mensaje: 'Error al procesar la contraseña' });
-
-      // Guardar el nuevo administrador en la base de datos
-      const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
-      BD.query(query, [email, hashedPassword, 'admin'], (err) => {
-        if (err) return res.status(500).json({ mensaje: 'Error al agregar el administrador' });
-
-        res.status(201).json({ mensaje: 'Administrador agregado con éxito' });
-      });
-    });
-  });
-});
-
+// Manejo de errores no capturados
 process.on('uncaughtException', (err) => {
   console.error('❌ Error no capturado:', err);
 });

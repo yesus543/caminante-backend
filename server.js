@@ -115,6 +115,27 @@ app.post('/api/registroAdmin', (req, res) => {
   });
 });
 
+// Ruta para agregar una nueva ruta
+app.post('/api/agregarRuta', (req, res) => {
+  const { destino, precio, horarios, direccion, telefono, horarioSucursal, mapa } = req.body;
+
+  if (!destino || !precio || !horarios || !direccion || !telefono || !horarioSucursal || !mapa) {
+    return res.status(400).json({ mensaje: 'Faltan datos en el formulario' });
+  }
+
+  // Insertar la nueva ruta en la base de datos
+  const query = 'INSERT INTO rutas (destino, precio, horarios, direccion, telefono, horarioSucursal, mapa) VALUES (?, ?, ?, ?, ?, ?, ?)';
+  
+  BD.query(query, [destino, precio, JSON.stringify(horarios.split(',')), direccion, telefono, horarioSucursal, mapa], (err, result) => {
+    if (err) {
+      return res.status(500).json({ mensaje: 'Error al agregar la ruta' });
+    }
+
+    res.status(201).json({ mensaje: 'Ruta agregada con éxito' });
+  });
+});
+
+
 // Ruta para obtener las rutas disponibles
 app.get('/api/rutas', (req, res) => {
   // Consulta a la base de datos para obtener las rutas

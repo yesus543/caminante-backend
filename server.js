@@ -82,6 +82,27 @@ app.post('/api/registro', (req, res) => {
     }
   );
 });
+app.post('/api/registrar-admin', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ mensaje: 'Email y contraseña son obligatorios' });
+  }
+
+  // Hashear la contraseña antes de guardarla
+  bcrypt.hash(password, 10, (err, hashedPassword) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al procesar la contraseña' });
+
+    // Guardar el nuevo administrador en la base de datos
+    const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
+    BD.query(query, [email, hashedPassword, 'admin'], (err, result) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al agregar el administrador' });
+      
+      res.status(201).json({ mensaje: 'Administrador agregado con éxito' });
+    });
+  });
+});
+
 
 process.on('uncaughtException', (err) => {
   console.error('❌ Error no capturado:', err);

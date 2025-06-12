@@ -60,6 +60,7 @@ app.post('/api/login', (req, res) => {
 app.post('/api/registroUSER', (req, res) => {
   const { email, password } = req.body; // Solo necesitamos correo y contraseña
 
+  if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
 
   // Verificar si el correo ya está registrado
   BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, result) => {

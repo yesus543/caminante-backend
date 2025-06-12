@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ Conexión segura con Pool
 const BD = mysql.createPool({
   connectionLimit: 10,
   host: process.env.DB_HOST,
@@ -17,7 +16,6 @@ const BD = mysql.createPool({
   database: process.env.DB_NAME,
 });
 
-// Middleware para verificar conexión
 BD.getConnection((err, connection) => {
   if (err) {
     console.error('❌ Error al conectar con MySQL:', err);
@@ -27,19 +25,12 @@ BD.getConnection((err, connection) => {
   }
 });
 
-// 🌐 RUTAS
-
-app.get('/api/productos', (req, res) => {
-  BD.query('SELECT * FROM productos', (err, result) => {
-    if (err) return res.status(500).json({ mensaje: 'Error en consulta' });
-    res.json(result);
-  });
-});
-
+// Ruta de login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
 
+  // Consulta para verificar el usuario y su rol
   BD.query(
     'SELECT * FROM usuarios WHERE correo = ? AND contrasena = ?',
     [email, password],
@@ -47,7 +38,19 @@ app.post('/api/login', (req, res) => {
       if (err) return res.status(500).json({ mensaje: 'Error interno' });
 
       if (result.length > 0) {
-        res.json({ autenticado: true, usuario: result[0] });
+        const usuario = result[0];
+
+        // Verificamos el rol del usuario
+        const rol = usuario.rol;
+
+        // Enviamos la respuesta dependiendo del rol
+        if (rol === 'admin') {
+          res.json({ autenticado: true, usuario: usuario, rol: 'admin' });
+        } else if (rol === 'usuario') {
+          res.json({ autenticado: true, usuario: usuario, rol: 'usuario' });
+        } else {
+          res.status(403).json({ autenticado: false, mensaje: 'Rol desconocido' });
+        }
       } else {
         res.status(401).json({ autenticado: false, mensaje: 'Credenciales incorrectas' });
       }
@@ -55,13 +58,19 @@ app.post('/api/login', (req, res) => {
   );
 });
 
+// Ruta de registro
 app.post('/api/registro', (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
+  const { email, password, rol } = req.body;
+  if (!email || !password || !rol) return res.status(400).json({ mensaje: 'Faltan datos' });
+
+  // Validar rol (debe ser 'admin' o 'usuario')
+  if (rol !== 'admin' && rol !== 'usuario') {
+    return res.status(400).json({ mensaje: 'Rol no válido' });
+  }
 
   BD.query(
-    'INSERT INTO usuarios (correo, contrasena) VALUES (?, ?)',
-    [email, password],
+    'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)',
+    [email, password, rol],
     (err) => {
       if (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -74,7 +83,6 @@ app.post('/api/registro', (req, res) => {
   );
 });
 
-// 🧯 Captura de errores globales
 process.on('uncaughtException', (err) => {
   console.error('❌ Error no capturado:', err);
 });
@@ -83,7 +91,7 @@ process.on('unhandledRejection', (err) => {
   console.error('❌ Promesa rechazada sin capturar:', err);
 });
 
-// 🚀 Iniciar servidor
+// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
+  console.log(`Servidor iniciado en puerto ${PORT} :D`);
 });

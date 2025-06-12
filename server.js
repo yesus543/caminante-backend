@@ -49,7 +49,14 @@ app.post('/api/login', (req, res) => {
           if (isMatch) {
             const rol = usuario.rol;
             // Si las credenciales son correctas, regresamos los datos del usuario y su rol
-            res.json({ autenticado: true, usuario: usuario, rol: rol });
+            // También podemos hacer una verificación de rol aquí si es necesario
+
+            if (rol === 'admin') {
+              // Si el rol es admin, podemos agregar lógica adicional o marcarlo
+              return res.json({ autenticado: true, usuario: usuario, rol: rol, esAdmin: true });
+            }
+
+            res.json({ autenticado: true, usuario: usuario, rol: rol, esAdmin: false });
           } else {
             res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
           }
@@ -60,6 +67,7 @@ app.post('/api/login', (req, res) => {
     }
   );
 });
+
 
 // Ruta de registro (solo para usuarios)
 app.post('/api/registroUSER', (req, res) => {

@@ -27,6 +27,8 @@ BD.getConnection((err, connection) => {
     connection.release();
   }
 });
+
+// Ruta de login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
@@ -55,8 +57,6 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-
-
 // Ruta de registro (solo para usuarios)
 app.post('/api/registroUSER', (req, res) => {
   const { email, password } = req.body; // Solo necesitamos correo y contraseña
@@ -81,6 +81,35 @@ app.post('/api/registroUSER', (req, res) => {
         if (err) return res.status(500).json({ mensaje: 'Error al registrar el usuario' });
 
         res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
+      });
+    });
+  });
+});
+
+// Ruta de registro solo para administradores
+app.post('/api/registroAdmin', (req, res) => {
+  const { email, password } = req.body; // Solo necesitamos correo y contraseña
+
+  if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
+
+  // Verificar si el correo ya está registrado
+  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, result) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al verificar el correo' });
+
+    if (result.length > 0) {
+      return res.status(409).json({ mensaje: 'Correo ya registrado' });
+    }
+
+    // Hashear la contraseña antes de guardarla
+    bcrypt.hash(password, 10, (err, hashedPassword) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al procesar la contraseña' });
+
+      // Guardar el nuevo administrador con rol 'admin'
+      const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
+      BD.query(query, [email, hashedPassword, 'admin'], (err) => {
+        if (err) return res.status(500).json({ mensaje: 'Error al registrar el administrador' });
+
+        res.status(201).json({ mensaje: 'Administrador registrado correctamente' });
       });
     });
   });

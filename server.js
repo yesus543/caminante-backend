@@ -27,46 +27,34 @@ BD.getConnection((err, connection) => {
     connection.release();
   }
 });
-
-// Ruta de login
-// Ruta de login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
 
-  BD.query(
-    'SELECT * FROM usuarios WHERE correo = ?',
-    [email],
-    (err, result) => {
-      if (err) return res.status(500).json({ mensaje: 'Error interno' });
+  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, result) => {
+    if (err) return res.status(500).json({ mensaje: 'Error interno' });
 
-      if (result.length > 0) {
-        const usuario = result[0];
-        // Comparar las contraseñas
-        bcrypt.compare(password, usuario.contrasena, (err, isMatch) => {
-          if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
+    if (result.length > 0) {
+      const usuario = result[0];
+      
+      // Comparar las contraseñas usando bcrypt
+      bcrypt.compare(password, usuario.contrasena, (err, isMatch) => {
+        if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
 
-          if (isMatch) {
-            const rol = usuario.rol;
-            // Si las credenciales son correctas, regresamos los datos del usuario y su rol
-            // También podemos hacer una verificación de rol aquí si es necesario
-
-            if (rol === 'admin') {
-              // Si el rol es admin, podemos agregar lógica adicional o marcarlo
-              return res.json({ autenticado: true, usuario: usuario, rol: rol, esAdmin: true });
-            }
-
-            res.json({ autenticado: true, usuario: usuario, rol: rol, esAdmin: false });
-          } else {
-            res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
-          }
-        });
-      } else {
-        res.status(401).json({ autenticado: false, mensaje: 'Correo no encontrado' });
-      }
+        if (isMatch) {
+          const rol = usuario.rol;
+          // Si las credenciales son correctas, regresamos los datos del usuario y su rol
+          res.json({ autenticado: true, usuario: usuario, rol: rol });
+        } else {
+          res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
+        }
+      });
+    } else {
+      res.status(401).json({ autenticado: false, mensaje: 'Correo no encontrado' });
     }
-  );
+  });
 });
+
 
 
 // Ruta de registro (solo para usuarios)

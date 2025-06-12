@@ -29,6 +29,7 @@ BD.getConnection((err, connection) => {
 });
 
 // Ruta de login
+// Ruta de login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
@@ -47,6 +48,7 @@ app.post('/api/login', (req, res) => {
 
           if (isMatch) {
             const rol = usuario.rol;
+            // Si las credenciales son correctas, regresamos los datos del usuario y su rol
             res.json({ autenticado: true, usuario: usuario, rol: rol });
           } else {
             res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });

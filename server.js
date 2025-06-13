@@ -128,29 +128,44 @@ app.get('/api/usuarios', (req, res) => {
     res.json(result);
   });
 });
+
 // Ruta para eliminar un usuario
 app.delete('/api/usuarios/:id/eliminar', (req, res) => {
   const { id } = req.params;
 
-  // Verifica si el usuario que intenta hacer la eliminación es un admin
-  const usuario = JSON.parse(req.headers['usuario']);
-  if (!usuario || usuario.rol !== 'admin') {
-    return res.status(403).json({ mensaje: 'No tienes permisos para eliminar usuarios' });
+  // Verificar el token de autenticación
+  const token = req.headers['authorization'];
+  if (!token) {
+    return res.status(401).json({ mensaje: 'No se proporcionó un token de autenticación' });
   }
 
-  const query = 'DELETE FROM usuarios WHERE id = ?';
-  BD.query(query, [id], (err, result) => {
+  // Decodificar y verificar el token JWT
+  jwt.verify(token, 'tu_clave_secreta', (err, decoded) => {
     if (err) {
-      return res.status(500).json({ mensaje: 'Error al eliminar el usuario' });
+      return res.status(403).json({ mensaje: 'Token inválido' });
     }
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    // Verificar si el usuario tiene rol de admin
+    const usuario = decoded;  // Suponiendo que el rol y otros datos del usuario estén decodificados en el token
+    if (usuario.rol !== 'admin') {
+      return res.status(403).json({ mensaje: 'No tienes permisos para eliminar usuarios' });
     }
 
-    res.json({ mensaje: 'Usuario eliminado correctamente' });
+    const query = 'DELETE FROM usuarios WHERE id = ?';
+    BD.query(query, [id], (err, result) => {
+      if (err) {
+        return res.status(500).json({ mensaje: 'Error al eliminar el usuario' });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+      }
+
+      res.json({ mensaje: 'Usuario eliminado correctamente' });
+    });
   });
 });
+
 
 
 // Iniciar servidor

@@ -1,22 +1,27 @@
 const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs'); // Asegúrate de importar bcrypt
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Habilitar CORS
-app.use(cors());
+// Habilitar CORS para permitir solicitudes desde el frontend
+app.use(cors({
+  origin: 'http://localhost:5173', // Si tu frontend está en localhost con Vite
+  // origin: 'https://mi-frontend.com', // Si tu frontend está en producción
+}));
+
+// Middleware para parsear el body como JSON
 app.use(express.json());
 
 // Conexión a la base de datos
 const BD = mysql.createPool({
   connectionLimit: 10,
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: process.env.DB_HOST,  // Ejemplo: 'mi-servidor.mysql.hostinger.com'
+  user: process.env.DB_USER,  // Tu usuario MySQL
+  password: process.env.DB_PASSWORD,  // Tu contraseña MySQL
+  database: process.env.DB_NAME,  // El nombre de tu base de datos
 });
 
 // Verificación de la conexión
@@ -28,15 +33,6 @@ BD.getConnection((err, connection) => {
     connection.release();
   }
 });
-
-// Middleware para verificar que el usuario es admin
-const verificarAdmin = (req, res, next) => {
-  const usuario = JSON.parse(req.headers['usuario']);
-  if (!usuario || usuario.rol !== 'admin') {
-    return res.status(403).json({ mensaje: 'No tienes permisos para realizar esta acción' });
-  }
-  next();
-};
 
 // Ruta de login
 app.post('/api/login', (req, res) => {
@@ -64,8 +60,34 @@ app.post('/api/login', (req, res) => {
   });
 });
 
+// Ruta de registro (solo para usuarios)
+app.post('/api/registroUSER', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
+
+  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, result) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al verificar el correo' });
+
+    if (result.length > 0) {
+      return res.status(409).json({ mensaje: 'Correo ya registrado' });
+    }
+
+    bcrypt.hash(password, 10, (err, hashedPassword) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al procesar la contraseña' });
+
+      const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
+      BD.query(query, [email, hashedPassword, 'usuario'], (err) => {
+        if (err) return res.status(500).json({ mensaje: 'Error al registrar el usuario' });
+
+        res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
+      });
+    });
+  });
+});
+
 // Ruta para modificar la contraseña de un usuario
-app.put('/api/usuarios/:id/modificar-password', verificarAdmin, (req, res) => {
+app.put('/api/usuarios/:id/modificar-password', (req, res) => {
   const { id } = req.params;
   const { password } = req.body;
 
@@ -83,7 +105,7 @@ app.put('/api/usuarios/:id/modificar-password', verificarAdmin, (req, res) => {
 });
 
 // Ruta para modificar el rol de un usuario
-app.put('/api/usuarios/:id/modificar-rol', verificarAdmin, (req, res) => {
+app.put('/api/usuarios/:id/modificar-rol', (req, res) => {
   const { id } = req.params;
   const { rol } = req.body;
 
@@ -99,7 +121,7 @@ app.put('/api/usuarios/:id/modificar-rol', verificarAdmin, (req, res) => {
 });
 
 // Ruta para obtener los usuarios (solo admin)
-app.get('/api/usuarios', verificarAdmin, (req, res) => {
+app.get('/api/usuarios', (req, res) => {
   const query = 'SELECT * FROM usuarios';
   BD.query(query, (err, result) => {
     if (err) return res.status(500).json({ mensaje: 'Error al obtener los usuarios' });
@@ -107,6 +129,7 @@ app.get('/api/usuarios', verificarAdmin, (req, res) => {
   });
 });
 
+// Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor iniciado en puerto ${PORT}`);
 });

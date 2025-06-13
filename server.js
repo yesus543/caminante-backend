@@ -155,6 +155,73 @@ app.get('/api/rutas', (req, res) => {
   });
 });
 
+// Ruta para modificar la contraseña de un usuario
+app.put('/api/usuarios/:id/modificar-password', (req, res) => {
+  const { id } = req.params; // ID del usuario que se quiere modificar
+  const { password } = req.body; // Nueva contraseña
+
+  if (!password) return res.status(400).json({ mensaje: 'Falta la nueva contraseña' });
+
+  // Hashear la nueva contraseña
+  bcrypt.hash(password, 10, (err, hashedPassword) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al procesar la contraseña' });
+
+    // Actualizar la contraseña en la base de datos
+    const query = 'UPDATE usuarios SET contrasena = ? WHERE id = ?';
+    BD.query(query, [hashedPassword, id], (err, result) => {
+      if (err) {
+        return res.status(500).json({ mensaje: 'Error al actualizar la contraseña' });
+      }
+
+      res.json({ mensaje: 'Contraseña actualizada correctamente' });
+    });
+  });
+});
+
+// Ruta para modificar el rol de un usuario
+app.put('/api/usuarios/:id/modificar-rol', (req, res) => {
+  const { id } = req.params; // ID del usuario que se quiere modificar
+  const { rol } = req.body; // Nuevo rol
+
+  if (!rol) return res.status(400).json({ mensaje: 'Falta el nuevo rol' });
+
+  // Verificar que el rol sea válido
+  if (rol !== 'admin' && rol !== 'usuario') {
+    return res.status(400).json({ mensaje: 'Rol inválido' });
+  }
+
+  // Actualizar el rol en la base de datos
+  const query = 'UPDATE usuarios SET rol = ? WHERE id = ?';
+  BD.query(query, [rol, id], (err, result) => {
+    if (err) {
+      return res.status(500).json({ mensaje: 'Error al actualizar el rol' });
+    }
+
+    res.json({ mensaje: 'Rol actualizado correctamente' });
+  });
+});
+
+// Ruta para obtener todos los usuarios (solo para admins)
+app.get('/api/usuarios', (req, res) => {
+  const usuario = JSON.parse(req.headers['usuario']); // Aquí se asume que el usuario logueado se pasa en los headers
+  if (!usuario || usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'No tienes permisos para acceder a esta ruta' });
+  }
+
+  // Obtener todos los usuarios
+  const query = 'SELECT * FROM usuarios';
+  BD.query(query, (err, result) => {
+    if (err) {
+      console.error('Error al obtener los usuarios:', err);
+      return res.status(500).json({ mensaje: 'Error al obtener los usuarios' });
+    }
+
+    res.json(result); // Retornar la lista de usuarios
+  });
+});
+
+
+
 // Manejo de errores no capturados
 process.on('uncaughtException', (err) => {
   console.error('❌ Error no capturado:', err);

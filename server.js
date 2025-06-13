@@ -128,6 +128,30 @@ app.get('/api/usuarios', (req, res) => {
     res.json(result);
   });
 });
+// Ruta para eliminar un usuario
+app.delete('/api/usuarios/:id/eliminar', (req, res) => {
+  const { id } = req.params;
+
+  // Verifica si el usuario que intenta hacer la eliminación es un admin
+  const usuario = JSON.parse(req.headers['usuario']);
+  if (!usuario || usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'No tienes permisos para eliminar usuarios' });
+  }
+
+  const query = 'DELETE FROM usuarios WHERE id = ?';
+  BD.query(query, [id], (err, result) => {
+    if (err) {
+      return res.status(500).json({ mensaje: 'Error al eliminar el usuario' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    }
+
+    res.json({ mensaje: 'Usuario eliminado correctamente' });
+  });
+});
+
 
 // Iniciar servidor
 app.listen(PORT, () => {

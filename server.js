@@ -1,7 +1,8 @@
 const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
-const bcrypt = require('bcryptjs'); // Asegúrate de importar bcrypt
+const bcrypt = require('bcryptjs'); 
+const jwt = require('jsonwebtoken'); // Asegúrate de importar jsonwebtoken
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,7 +50,9 @@ app.post('/api/login', (req, res) => {
         if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
 
         if (isMatch) {
-          res.json({ autenticado: true, usuario: usuario, rol: usuario.rol });
+          // Generamos el token JWT al hacer login
+          const token = jwt.sign({ id: usuario.id, correo: usuario.correo, rol: usuario.rol }, 'tu_clave_secreta', { expiresIn: '1h' });
+          res.json({ autenticado: true, usuario: usuario, rol: usuario.rol, token });
         } else {
           res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
         }
@@ -57,32 +60,6 @@ app.post('/api/login', (req, res) => {
     } else {
       res.status(401).json({ autenticado: false, mensaje: 'Correo no encontrado' });
     }
-  });
-});
-
-// Ruta de registro (solo para usuarios)
-app.post('/api/registroUSER', (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
-
-  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, result) => {
-    if (err) return res.status(500).json({ mensaje: 'Error al verificar el correo' });
-
-    if (result.length > 0) {
-      return res.status(409).json({ mensaje: 'Correo ya registrado' });
-    }
-
-    bcrypt.hash(password, 10, (err, hashedPassword) => {
-      if (err) return res.status(500).json({ mensaje: 'Error al procesar la contraseña' });
-
-      const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
-      BD.query(query, [email, hashedPassword, 'usuario'], (err) => {
-        if (err) return res.status(500).json({ mensaje: 'Error al registrar el usuario' });
-
-        res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
-      });
-    });
   });
 });
 
@@ -134,7 +111,8 @@ app.delete('/api/usuarios/:id/eliminar', (req, res) => {
   const { id } = req.params;
 
   // Verificar el token de autenticación
-  const token = req.headers['authorization'];
+  const token = req.headers['authorization']?.split(' ')[1];  // "Bearer token"
+  
   if (!token) {
     return res.status(401).json({ mensaje: 'No se proporcionó un token de autenticación' });
   }
@@ -165,8 +143,6 @@ app.delete('/api/usuarios/:id/eliminar', (req, res) => {
     });
   });
 });
-
-
 
 // Iniciar servidor
 app.listen(PORT, () => {

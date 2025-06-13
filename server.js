@@ -1,7 +1,7 @@
 const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
-const bcrypt = require('bcryptjs'); 
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken'); // Asegúrate de importar jsonwebtoken
 
 const app = express();
@@ -45,13 +45,18 @@ app.post('/api/login', (req, res) => {
 
     if (result.length > 0) {
       const usuario = result[0];
-      
+
       bcrypt.compare(password, usuario.contrasena, (err, isMatch) => {
         if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
 
         if (isMatch) {
           // Generamos el token JWT al hacer login
-          const token = jwt.sign({ id: usuario.id, correo: usuario.correo, rol: usuario.rol }, 'tu_clave_secreta', { expiresIn: '1h' });
+          const token = jwt.sign(
+            { id: usuario.id, correo: usuario.correo, rol: usuario.rol },
+            'tu_clave_secreta', // La clave secreta para firmar el JWT
+            { expiresIn: '1h' } // El token expirará en 1 hora
+          );
+
           res.json({ autenticado: true, usuario: usuario, rol: usuario.rol, token });
         } else {
           res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });

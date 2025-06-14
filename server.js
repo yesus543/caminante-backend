@@ -90,7 +90,8 @@ app.post('/api/registroUSER', (req, res) => {
   });
 });
 
-// 9) Login\ napp.post('/api/login', (req, res) => {
+// 9) Login
+app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ mensaje: 'Faltan datos' });

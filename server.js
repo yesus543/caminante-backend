@@ -161,17 +161,19 @@ app.delete('/api/usuarios/:id/eliminar', verifyToken, (req, res) => {
 });
 
 // 12) RUTAS (solo usuarios autenticados)
-app.get('/api/rutas', verifyToken, (req, res) => {
-  const sql = 'SELECT id, destino, precio, horarios, mapa FROM rutas';
-  BD.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ mensaje: 'Error interno' });
-    const rutas = results.map(r => ({
-      ...r,
-      horarios: typeof r.horarios === 'string'
-        ? JSON.parse(r.horarios)
-        : r.horarios
+app.get('/api/rutas', (req, res) => {
+  BD.query('SELECT * FROM rutas', (err, result) => {
+    if (err) {
+      console.error('Error al obtener las rutas:', err);
+      return res.status(500).json({ mensaje: 'Error al obtener las rutas' });
+    }
+
+    const rutas = result.map(ruta => ({
+      ...ruta,
+      horarios: JSON.parse(ruta.horarios), // Convertir el campo JSON de horarios a un arreglo
     }));
-    res.json(rutas);
+
+    res.json(rutas); // Devolver las rutas como respuesta
   });
 });
 

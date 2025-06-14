@@ -1,151 +1,157 @@
+require('dotenv').config();                // Carga .env
 const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken'); // Asegúrate de importar jsonwebtoken
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Habilitar CORS para permitir solicitudes desde el frontend
+// Habilitar CORS
 app.use(cors({
-  origin: 'http://localhost:5173', // Si tu frontend está en localhost con Vite
-  // origin: 'https://mi-frontend.com', // Si tu frontend está en producción
+  origin: 'http://localhost:5173',        // Ajusta según tu frontend
 }));
 
-// Middleware para parsear el body como JSON
+// Parseo de JSON
 app.use(express.json());
 
-// Conexión a la base de datos
+// Pool de conexiones MySQL
 const BD = mysql.createPool({
   connectionLimit: 10,
-  host: process.env.DB_HOST,  // Ejemplo: 'mi-servidor.mysql.hostinger.com'
-  user: process.env.DB_USER,  // Tu usuario MySQL
-  password: process.env.DB_PASSWORD,  // Tu contraseña MySQL
-  database: process.env.DB_NAME,  // El nombre de tu base de datos
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
-// Verificación de la conexión
+// Verificación de conexión
 BD.getConnection((err, connection) => {
   if (err) {
     console.error('❌ Error al conectar con MySQL:', err);
   } else {
-    console.log('✅ Conectado a MySQL en Hostinger');
+    console.log('✅ Conectado a MySQL');
     connection.release();
   }
 });
 
-// Ruta de login
+// Middleware para validar JWT
+function verifyToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) 
+    return res.status(401).json({ mensaje: 'Token requerido' });
+
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) 
+      return res.status(403).json({ mensaje: 'Token inválido' });
+    req.usuario = decoded; // { id, rol }
+    next();
+  });
+}
+
+// Ruta de login: genera JWT
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ mensaje: 'Faltan datos' });
+  if (!email || !password) 
+    return res.status(400).json({ mensaje: 'Faltan datos' });
 
-  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, result) => {
+  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    if (results.length === 0) 
+      return res.status(401).json({ autenticado: false, mensaje: 'Correo no encontrado' });
 
-    if (result.length > 0) {
-      const usuario = result[0];
+    const usuario = results[0];
+    bcrypt.compare(password, usuario.contrasena, (err, isMatch) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
+      if (!isMatch) 
+        return res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
 
-      bcrypt.compare(password, usuario.contrasena, (err, isMatch) => {
-        if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
+      const payload = { id: usuario.id, rol: usuario.rol };
+      const token = jwt.sign(
+        payload,
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
 
-        if (isMatch) {
-          // Generamos el token JWT al hacer login
-          const token = jwt.sign(
-            { id: usuario.id, correo: usuario.correo, rol: usuario.rol },
-            'tu_clave_secreta', // La clave secreta para firmar el JWT
-            { expiresIn: '1h' } // El token expirará en 1 hora
-          );
-
-          res.json({ autenticado: true, usuario: usuario, rol: usuario.rol, token });
-        } else {
-          res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
-        }
+      res.json({
+        autenticado: true,
+        usuario: { id: usuario.id, correo: usuario.correo, rol: usuario.rol },
+        token
       });
-    } else {
-      res.status(401).json({ autenticado: false, mensaje: 'Correo no encontrado' });
-    }
-  });
-});
-
-// Ruta para modificar la contraseña de un usuario
-app.put('/api/usuarios/:id/modificar-password', (req, res) => {
-  const { id } = req.params;
-  const { password } = req.body;
-
-  if (!password) return res.status(400).json({ mensaje: 'Falta la nueva contraseña' });
-
-  bcrypt.hash(password, 10, (err, hashedPassword) => {
-    if (err) return res.status(500).json({ mensaje: 'Error al procesar la contraseña' });
-
-    const query = 'UPDATE usuarios SET contrasena = ? WHERE id = ?';
-    BD.query(query, [hashedPassword, id], (err, result) => {
-      if (err) return res.status(500).json({ mensaje: 'Error al actualizar la contraseña' });
-      res.json({ mensaje: 'Contraseña actualizada correctamente' });
     });
   });
 });
 
-// Ruta para modificar el rol de un usuario
-app.put('/api/usuarios/:id/modificar-rol', (req, res) => {
+// Ruta para obtener todos los usuarios (solo admin)
+app.get('/api/usuarios', verifyToken, (req, res) => {
+  if (req.usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'Acceso denegado' });
+  }
+
+  BD.query('SELECT id, nombre, correo, rol FROM usuarios', (err, results) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al obtener usuarios' });
+    res.json(results);
+  });
+});
+
+// Ruta para modificar contraseña
+app.put('/api/usuarios/:id/modificar-password', verifyToken, (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ mensaje: 'Falta la nueva contraseña' });
+
+  // Solo el propio usuario o admin
+  if (req.usuario.id !== Number(id) && req.usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'Acceso denegado' });
+  }
+
+  bcrypt.hash(password, 10, (err, hash) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al hashear contraseña' });
+    BD.query(
+      'UPDATE usuarios SET contrasena = ? WHERE id = ?',
+      [hash, id],
+      (err) => {
+        if (err) return res.status(500).json({ mensaje: 'Error al actualizar contraseña' });
+        res.json({ mensaje: 'Contraseña actualizada correctamente' });
+      }
+    );
+  });
+});
+
+// Ruta para modificar rol (solo admin)
+app.put('/api/usuarios/:id/modificar-rol', verifyToken, (req, res) => {
   const { id } = req.params;
   const { rol } = req.body;
-
+  if (req.usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'Acceso denegado' });
+  }
   if (!rol || (rol !== 'admin' && rol !== 'usuario')) {
     return res.status(400).json({ mensaje: 'Rol inválido' });
   }
 
-  const query = 'UPDATE usuarios SET rol = ? WHERE id = ?';
-  BD.query(query, [rol, id], (err, result) => {
-    if (err) return res.status(500).json({ mensaje: 'Error al actualizar el rol' });
-    res.json({ mensaje: 'Rol actualizado correctamente' });
-  });
+  BD.query(
+    'UPDATE usuarios SET rol = ? WHERE id = ?',
+    [rol, id],
+    (err) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al actualizar rol' });
+      res.json({ mensaje: 'Rol actualizado correctamente' });
+    }
+  );
 });
 
-// Ruta para obtener los usuarios (solo admin)
-app.get('/api/usuarios', (req, res) => {
-  const query = 'SELECT * FROM usuarios';
-  BD.query(query, (err, result) => {
-    if (err) return res.status(500).json({ mensaje: 'Error al obtener los usuarios' });
-    res.json(result);
-  });
-});
-
-// Ruta para eliminar un usuario
-app.delete('/api/usuarios/:id/eliminar', (req, res) => {
-  const { id } = req.params;
-
-  // Verificar el token de autenticación
-  const token = req.headers['authorization']?.split(' ')[1];  // "Bearer token"
-  
-  if (!token) {
-    return res.status(401).json({ mensaje: 'No se proporcionó un token de autenticación' });
+// Ruta para eliminar un usuario (solo admin)
+app.delete('/api/usuarios/:id/eliminar', verifyToken, (req, res) => {
+  if (req.usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'Acceso denegado' });
   }
-
-  // Decodificar y verificar el token JWT
-  jwt.verify(token, 'tu_clave_secreta', (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ mensaje: 'Token inválido' });
+  const { id } = req.params;
+  BD.query('DELETE FROM usuarios WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).json({ mensaje: 'Error al eliminar usuario' });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
     }
-
-    // Verificar si el usuario tiene rol de admin
-    const usuario = decoded;  // Suponiendo que el rol y otros datos del usuario estén decodificados en el token
-    if (usuario.rol !== 'admin') {
-      return res.status(403).json({ mensaje: 'No tienes permisos para eliminar usuarios' });
-    }
-
-    const query = 'DELETE FROM usuarios WHERE id = ?';
-    BD.query(query, [id], (err, result) => {
-      if (err) {
-        return res.status(500).json({ mensaje: 'Error al eliminar el usuario' });
-      }
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ mensaje: 'Usuario no encontrado' });
-      }
-
-      res.json({ mensaje: 'Usuario eliminado correctamente' });
-    });
+    res.json({ mensaje: 'Usuario eliminado correctamente' });
   });
 });
 

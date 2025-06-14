@@ -142,14 +142,12 @@ app.put('/api/usuarios/:id/modificar-rol', verifyToken, (req, res) => {
     }
   );
 });
+// Justo antes de app.listen(...)
 app.get('/api/rutas', verifyToken, (req, res) => {
   const sql = 'SELECT id, destino, precio, horarios, mapa FROM rutas';
   BD.query(sql, (err, results) => {
-    if (err) {
-      console.error('Error al leer rutas:', err);
-      return res.status(500).json({ mensaje: 'Error interno al obtener rutas' });
-    }
-    // Si 'horarios' está guardado como JSON-string en MySQL:
+    if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    // Parsear JSON si tus horarios vienen como texto
     const rutas = results.map(r => ({
       ...r,
       horarios: typeof r.horarios === 'string'
@@ -159,6 +157,7 @@ app.get('/api/rutas', verifyToken, (req, res) => {
     res.json(rutas);
   });
 });
+
 // Ruta para eliminar un usuario (solo admin)
 app.delete('/api/usuarios/:id/eliminar', verifyToken, (req, res) => {
   if (req.usuario.rol !== 'admin') {

@@ -17,6 +17,7 @@ const PORT = process.env.PORT || 3000;
 // 2) Configura CORS (puedes ajustar FRONTEND_URL en tu .env de Render)
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  // credentials: true, // si necesitas cookies
 }));
 
 // 3) Parseo de JSON
@@ -41,8 +42,7 @@ BD.getConnection((err, conn) => {
   }
 });
 
-// 6) Middleware para validar JWT
-function verifyToken(req, res, next) {
+// 6) Middleware para validar JWT\ nfunction verifyToken(req, res, next) {
   const header = req.headers.authorization;
   if (!header) {
     return res.status(401).json({ mensaje: 'Token requerido' });
@@ -55,7 +55,7 @@ function verifyToken(req, res, next) {
     req.usuario = decoded; // { id, rol }
     next();
   });
-}
+
 
 // 7) LOGIN: genera y devuelve JWT
 app.post('/api/login', (req, res) => {

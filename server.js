@@ -65,8 +65,32 @@ function verifyToken(req, res, next) {
   });
 }
 
-// 8) Login
-app.post('/api/login', (req, res) => {
+// 8) Registro de usuario (público)
+app.post('/api/registroUSER', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ mensaje: 'Faltan datos' });
+  }
+  // Validar existencia
+  BD.query('SELECT id FROM usuarios WHERE correo = ?', [email], (err, results) => {
+    if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    if (results.length > 0) {
+      return res.status(409).json({ mensaje: 'Correo ya registrado' });
+    }
+    // Hashear contraseña
+    bcrypt.hash(password, 10, (err, hash) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al procesar contraseña' });
+      // Insertar nuevo usuario con rol 'usuario'
+      const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
+      BD.query(query, [email, hash, 'usuario'], (err) => {
+        if (err) return res.status(500).json({ mensaje: 'Error al registrar usuario' });
+        res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
+      });
+    });
+  });
+});
+
+// 9) Login\ napp.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ mensaje: 'Faltan datos' });
@@ -89,7 +113,7 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-// 9) Obtener usuarios (admin)
+// 10) Obtener usuarios (admin)
 app.get('/api/usuarios', verifyToken, (req, res) => {
   if (req.usuario.rol !== 'admin') {
     return res.status(403).json({ mensaje: 'Acceso denegado' });
@@ -100,7 +124,7 @@ app.get('/api/usuarios', verifyToken, (req, res) => {
   });
 });
 
-// 10) Modificar contraseña
+// 11) Modificar contraseña
 app.put('/api/usuarios/:id/modificar-password', verifyToken, (req, res) => {
   const { id } = req.params;
   const { password } = req.body;
@@ -119,7 +143,7 @@ app.put('/api/usuarios/:id/modificar-password', verifyToken, (req, res) => {
   });
 });
 
-// 11) Modificar rol
+// 12) Modificar rol
 app.put('/api/usuarios/:id/modificar-rol', verifyToken, (req, res) => {
   const { id } = req.params;
   const { rol } = req.body;
@@ -135,7 +159,7 @@ app.put('/api/usuarios/:id/modificar-rol', verifyToken, (req, res) => {
   });
 });
 
-// 12) Eliminar usuario
+// 13) Eliminar usuario
 app.delete('/api/usuarios/:id/eliminar', verifyToken, (req, res) => {
   if (req.usuario.rol !== 'admin') {
     return res.status(403).json({ mensaje: 'Acceso denegado' });
@@ -150,7 +174,7 @@ app.delete('/api/usuarios/:id/eliminar', verifyToken, (req, res) => {
   });
 });
 
-// 13) Obtener rutas
+// 14) Obtener rutas
 app.get('/api/rutas', verifyToken, (req, res) => {
   const sql = 'SELECT id, destino, precio, horarios, mapa FROM rutas';
   BD.query(sql, (err, results) => {
@@ -163,7 +187,7 @@ app.get('/api/rutas', verifyToken, (req, res) => {
   });
 });
 
-// 14) Iniciar servidor
+// 15) Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor iniciado en puerto ${PORT}`);
 });

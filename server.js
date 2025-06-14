@@ -67,13 +67,16 @@ app.post('/api/login', (req, res) => {
       if (!isMatch) 
         return res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
 
+      // 1. Construir payload
       const payload = { id: usuario.id, rol: usuario.rol };
+      // 2. Firmar JWT
       const token = jwt.sign(
         payload,
-        process.env.JWT_SECRET,
+        process.env.JWT_SECRET,   // Debe estar en tu .env
         { expiresIn: '1h' }
       );
 
+      // 3. Enviar token al cliente
       res.json({
         autenticado: true,
         usuario: { id: usuario.id, correo: usuario.correo, rol: usuario.rol },

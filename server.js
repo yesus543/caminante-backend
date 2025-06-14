@@ -119,11 +119,22 @@ app.get('/api/usuarios', verifyToken, (req, res) => {
   if (req.usuario.rol !== 'admin') {
     return res.status(403).json({ mensaje: 'Acceso denegado' });
   }
-  BD.query('SELECT id, nombre, correo, rol FROM usuarios', (err, results) => {
-    if (err) return res.status(500).json({ mensaje: 'Error al obtener usuarios' });
-    res.json(results);
-  });
+  BD.query(
+    'SELECT id, nombre, correo, rol FROM usuarios',
+    (err, results) => {
+      if (err) {
+        console.error('Error en GET /api/usuarios:', err);
+        // En desarrollo podrías enviar err.message; en producción mejor ocultarlo.
+        return res.status(500).json({
+          mensaje: 'Error al obtener usuarios',
+          detalle: err.message
+        });
+      }
+      res.json(results);
+    }
+  );
 });
+
 
 // 11) Modificar contraseña
 app.put('/api/usuarios/:id/modificar-password', verifyToken, (req, res) => {

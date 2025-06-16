@@ -119,7 +119,7 @@ app.get('/api/usuarios', verifyToken, (req, res) => {
     return res.status(403).json({ mensaje: 'Acceso denegado' });
   }
   BD.query(
-    'SELECT id, nombre, correo, rol FROM usuarios',
+    'SELECT id, correo, rol FROM usuarios',
     (err, results) => {
       if (err) {
         console.error('▶️ Error en GET /api/usuarios:', err);
@@ -132,6 +132,7 @@ app.get('/api/usuarios', verifyToken, (req, res) => {
     }
   );
 });
+
 
 
 

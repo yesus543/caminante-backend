@@ -1,6 +1,6 @@
-// server.js (corregido)
+// server.js
 
-// 1) Carga variables de entorno siempre
+// 1) Carga variables de entorno
 require('dotenv').config();
 
 const express = require('express');
@@ -12,8 +12,15 @@ const jwt     = require('jsonwebtoken');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// 2) Validar vars de entorno
-const required = ['JWT_SECRET','DB_HOST','DB_USER','DB_PASSWORD','DB_NAME'];
+// 2) Validar variables de entorno
+const required = [
+  'JWT_SECRET',
+  'DB_HOST',
+  'DB_USER',
+  'DB_PASSWORD',
+  'DB_NAME',
+  'CORS_ORIGIN'
+];
 for (const key of required) {
   if (!process.env[key]) {
     console.error(`FATAL ERROR: La variable de entorno ${key} no está definida.`);
@@ -22,8 +29,25 @@ for (const key of required) {
 }
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// 3) Middlewares
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
+// 3) Configuración dinámica de CORS
+const allowedOrigins = [
+  process.env.CORS_ORIGIN,       // e.g. http://localhost:5173
+  'https://www.caminante.site'   // dominio de producción
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // permitir peticiones sin origin (Postman, mobile apps, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS Denied for origin ${origin}`), false);
+  },
+  credentials: true
+}));
+
+// 4) Middleware JSON
 app.use(express.json());
 
 // 4) Pool MySQL
@@ -44,6 +68,7 @@ BD.getConnection((err, conn) => {
   console.log('✅ Conectado a MySQL');
   conn.release();
 });
+
 
 // 6) Middleware JWT
 function verifyToken(req, res, next) {

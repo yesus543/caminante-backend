@@ -70,6 +70,52 @@ app.post('/api/registroUSER', (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ mensaje: 'Faltan datos' });
   }
+
+// 10bis) Registro de administrador (solo admin)
+app.post('/api/registroAdmin', verifyToken, (req, res) => {
+  // 1) Sólo admins pueden usarlo
+  if (req.usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'Acceso denegado: solo administradores' });
+  }
+
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ mensaje: 'Faltan datos' });
+  }
+
+  // 2) Verificar que no exista ya
+  BD.query(
+    'SELECT id FROM usuarios WHERE correo = ?',
+    [email],
+    (err, results) => {
+      if (err) return res.status(500).json({ mensaje: 'Error interno' });
+      if (results.length > 0) {
+        return res.status(409).json({ mensaje: 'Correo ya registrado' });
+      }
+
+      // 3) Hashear la contraseña
+      bcrypt.hash(password, 10, (err, hash) => {
+        if (err) return res.status(500).json({ mensaje: 'Error al procesar contraseña' });
+
+        // 4) Insertar con rol 'admin'
+        BD.query(
+          'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)',
+          [email, hash, 'admin'],
+          err => {
+            if (err) {
+              console.error('Error al registrar admin:', err);
+              return res.status(500).json({ mensaje: 'Error al registrar administrador' });
+            }
+            res.status(201).json({ mensaje: 'Administrador registrado correctamente' });
+          }
+        );
+      });
+    }
+  );
+});
+
+
+
   // Validar existencia
   BD.query('SELECT id FROM usuarios WHERE correo = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ mensaje: 'Error interno' });

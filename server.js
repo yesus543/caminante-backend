@@ -114,7 +114,6 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-// 10) Obtener usuarios (admin)
 app.get('/api/usuarios', verifyToken, (req, res) => {
   if (req.usuario.rol !== 'admin') {
     return res.status(403).json({ mensaje: 'Acceso denegado' });
@@ -123,8 +122,7 @@ app.get('/api/usuarios', verifyToken, (req, res) => {
     'SELECT id, nombre, correo, rol FROM usuarios',
     (err, results) => {
       if (err) {
-        console.error('Error en GET /api/usuarios:', err);
-        // En desarrollo podrías enviar err.message; en producción mejor ocultarlo.
+        console.error('▶️ Error en GET /api/usuarios:', err);
         return res.status(500).json({
           mensaje: 'Error al obtener usuarios',
           detalle: err.message
@@ -134,6 +132,7 @@ app.get('/api/usuarios', verifyToken, (req, res) => {
     }
   );
 });
+
 
 
 // 11) Modificar contraseña

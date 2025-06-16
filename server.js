@@ -1,6 +1,6 @@
-// server.js
+// server.js (corregido)
 
-// 1) Carga variables de entorno SIN IMPORTAR NODE_ENV
+// 1) Carga variables de entorno siempre
 require('dotenv').config();
 
 const express = require('express');
@@ -12,25 +12,18 @@ const jwt     = require('jsonwebtoken');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// 2) Validar JWT_SECRET y vars de BD
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  console.error('FATAL ERROR: JWT_SECRET no está definido.');
-  process.exit(1);
-}
-
-const requiredDB = ['DB_HOST','DB_USER','DB_PASSWORD','DB_NAME'];
-for (const v of requiredDB) {
-  if (!process.env[v]) {
-    console.error(`FATAL ERROR: ${v} no está definido.`);
+// 2) Validar vars de entorno
+const required = ['JWT_SECRET','DB_HOST','DB_USER','DB_PASSWORD','DB_NAME'];
+for (const key of required) {
+  if (!process.env[key]) {
+    console.error(`FATAL ERROR: La variable de entorno ${key} no está definida.`);
     process.exit(1);
   }
 }
+const JWT_SECRET = process.env.JWT_SECRET;
 
-// 3) Middleware
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-}));
+// 3) Middlewares
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json());
 
 // 4) Pool MySQL
@@ -54,83 +47,67 @@ BD.getConnection((err, conn) => {
 
 // 6) Middleware JWT
 function verifyToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ mensaje: 'Token requerido' });
-  const token = authHeader.split(' ')[1];
+  const auth = req.headers['authorization'];
+  if (!auth) return res.status(401).json({ mensaje: 'Token requerido' });
+  const token = auth.split(' ')[1];
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return res.status(403).json({ mensaje: 'Token inválido' });
-    req.usuario = decoded; // { id, rol }
+    req.usuario = decoded;
     next();
   });
 }
 
-// 8) Registro de usuario (público)
+// 7) Registro de usuario (público)
 app.post('/api/registroUSER', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ mensaje: 'Faltan datos' });
   }
-
-// 10bis) Registro de administrador (solo admin)
-app.post('/api/registroAdmin', verifyToken, (req, res) => {
-  // 1) Sólo admins pueden usarlo
-  if (req.usuario.rol !== 'admin') {
-    return res.status(403).json({ mensaje: 'Acceso denegado: solo administradores' });
-  }
-
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ mensaje: 'Faltan datos' });
-  }
-
-  // 2) Verificar que no exista ya
-  BD.query(
-    'SELECT id FROM usuarios WHERE correo = ?',
-    [email],
-    (err, results) => {
-      if (err) return res.status(500).json({ mensaje: 'Error interno' });
-      if (results.length > 0) {
-        return res.status(409).json({ mensaje: 'Correo ya registrado' });
-      }
-
-      // 3) Hashear la contraseña
-      bcrypt.hash(password, 10, (err, hash) => {
-        if (err) return res.status(500).json({ mensaje: 'Error al procesar contraseña' });
-
-        // 4) Insertar con rol 'admin'
-        BD.query(
-          'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)',
-          [email, hash, 'admin'],
-          err => {
-            if (err) {
-              console.error('Error al registrar admin:', err);
-              return res.status(500).json({ mensaje: 'Error al registrar administrador' });
-            }
-            res.status(201).json({ mensaje: 'Administrador registrado correctamente' });
-          }
-        );
-      });
-    }
-  );
-});
-
-
-
   // Validar existencia
   BD.query('SELECT id FROM usuarios WHERE correo = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ mensaje: 'Error interno' });
     if (results.length > 0) {
       return res.status(409).json({ mensaje: 'Correo ya registrado' });
     }
-    // Hashear contraseña
+    // Hashear y registrar como usuario
     bcrypt.hash(password, 10, (err, hash) => {
       if (err) return res.status(500).json({ mensaje: 'Error al procesar contraseña' });
-      // Insertar nuevo usuario con rol 'usuario'
-      const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
-      BD.query(query, [email, hash, 'usuario'], (err) => {
-        if (err) return res.status(500).json({ mensaje: 'Error al registrar usuario' });
-        res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
-      });
+      BD.query(
+        'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)',
+        [email, hash, 'usuario'],
+        err => {
+          if (err) return res.status(500).json({ mensaje: 'Error al registrar usuario' });
+          res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
+        }
+      );
+    });
+  });
+});
+
+// 8) Registro de administrador (solo admin)
+app.post('/api/registroAdmin', verifyToken, (req, res) => {
+  if (req.usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'Acceso denegado: solo administradores' });
+  }
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ mensaje: 'Faltan datos' });
+  }
+  BD.query('SELECT id FROM usuarios WHERE correo = ?', [email], (err, results) => {
+    if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    if (results.length > 0) {
+      return res.status(409).json({ mensaje: 'Correo ya registrado' });
+    }
+    bcrypt.hash(password, 10, (err, hash) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al procesar contraseña' });
+      BD.query(
+        'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)',
+        [email, hash, 'admin'],
+        err => {
+          if (err) return res.status(500).json({ mensaje: 'Error al registrar administrador' });
+          res.status(201).json({ mensaje: 'Administrador registrado correctamente' });
+        }
+      );
     });
   });
 });
@@ -149,36 +126,26 @@ app.post('/api/login', (req, res) => {
     const usuario = results[0];
     bcrypt.compare(password, usuario.contrasena, (err, match) => {
       if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
-      if (!match) {
-        return res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
-      }
-      const payload = { id: usuario.id, rol: usuario.rol };
-      const token   = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+      if (!match) return res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
+      const token = jwt.sign({ id: usuario.id, rol: usuario.rol }, JWT_SECRET, { expiresIn: '1h' });
       res.json({ autenticado: true, usuario: { id: usuario.id, correo: usuario.correo, rol: usuario.rol }, token });
     });
   });
 });
 
-// 7) Obtener usuarios (solo admin)
+// 10) Obtener usuarios (solo admin)
 app.get('/api/usuarios', verifyToken, (req, res) => {
   if (req.usuario.rol !== 'admin') {
     return res.status(403).json({ mensaje: 'Acceso denegado' });
   }
-  BD.query(
-    'SELECT id, correo, rol FROM usuarios',
-    (err, results) => {
-      if (err) {
-        console.error('▶️ Error en GET /api/usuarios:', err);
-        return res.status(500).json({
-          mensaje: 'Error al obtener usuarios',
-          detalle: err.message
-        });
-      }
-      res.json(results);
+  BD.query('SELECT id, correo, rol FROM usuarios', (err, results) => {
+    if (err) {
+      console.error('▶️ Error en GET /api/usuarios:', err);
+      return res.status(500).json({ mensaje: 'Error al obtener usuarios', detalle: err.message });
     }
-  );
+    res.json(results);
+  });
 });
-
 
 
 // 11) Modificar contraseña

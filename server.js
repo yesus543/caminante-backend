@@ -1,7 +1,9 @@
 // server.js
 
-// 1) Carga variables de entorno SIN IMPORTAR NODE_ENV
-require('dotenv').config();
+// 1) Carga variables de entorno en desarrollo
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 const express = require('express');
 const mysql   = require('mysql');
@@ -12,28 +14,23 @@ const jwt     = require('jsonwebtoken');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// 2) Validar JWT_SECRET y vars de BD
+// 2) Verificar que exista JWT_SECRET
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.error('FATAL ERROR: JWT_SECRET no está definido.');
+  console.error('FATAL ERROR: JWT_SECRET is not defined.');
   process.exit(1);
 }
 
-const requiredDB = ['DB_HOST','DB_USER','DB_PASSWORD','DB_NAME'];
-for (const v of requiredDB) {
-  if (!process.env[v]) {
-    console.error(`FATAL ERROR: ${v} no está definido.`);
-    process.exit(1);
-  }
-}
-
-// 3) Middleware
+// 3) Configuración CORS
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  // credentials: true,
 }));
+
+// 4) Middleware JSON
 app.use(express.json());
 
-// 4) Pool MySQL
+// 5) Pool de MySQL
 const BD = mysql.createPool({
   connectionLimit: 10,
   host:     process.env.DB_HOST,
@@ -42,37 +39,87 @@ const BD = mysql.createPool({
   database: process.env.DB_NAME,
 });
 
-// 5) Verificar conexión
+// 6) Verificar conexión
 BD.getConnection((err, conn) => {
   if (err) {
     console.error('❌ Error al conectar con MySQL:', err);
-    process.exit(1);
+  } else {
+    console.log('✅ Conectado a MySQL');
+    conn.release();
   }
-  console.log('✅ Conectado a MySQL');
-  conn.release();
 });
 
-// 6) Middleware JWT
+// 7) Middleware JWT
 function verifyToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ mensaje: 'Token requerido' });
+  if (!authHeader) {
+    return res.status(401).json({ mensaje: 'Token requerido' });
+  }
   const token = authHeader.split(' ')[1];
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ mensaje: 'Token inválido' });
+    if (err) {
+      return res.status(403).json({ mensaje: 'Token inválido' });
+    }
     req.usuario = decoded; // { id, rol }
     next();
   });
 }
 
-// --- tus rutas de registro y login aquí ---
+// 8) Registro de usuario (público)
+app.post('/api/registroUSER', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ mensaje: 'Faltan datos' });
+  }
+  // Validar existencia
+  BD.query('SELECT id FROM usuarios WHERE correo = ?', [email], (err, results) => {
+    if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    if (results.length > 0) {
+      return res.status(409).json({ mensaje: 'Correo ya registrado' });
+    }
+    // Hashear contraseña
+    bcrypt.hash(password, 10, (err, hash) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al procesar contraseña' });
+      // Insertar nuevo usuario con rol 'usuario'
+      const query = 'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)';
+      BD.query(query, [email, hash, 'usuario'], (err) => {
+        if (err) return res.status(500).json({ mensaje: 'Error al registrar usuario' });
+        res.status(201).json({ mensaje: 'Usuario registrado correctamente' });
+      });
+    });
+  });
+});
 
-// 7) Obtener usuarios (solo admin)
+// 9) Login
+app.post('/api/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ mensaje: 'Faltan datos' });
+  }
+  BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, results) => {
+    if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    if (results.length === 0) {
+      return res.status(401).json({ autenticado: false, mensaje: 'Correo no encontrado' });
+    }
+    const usuario = results[0];
+    bcrypt.compare(password, usuario.contrasena, (err, match) => {
+      if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
+      if (!match) {
+        return res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
+      }
+      const payload = { id: usuario.id, rol: usuario.rol };
+      const token   = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+      res.json({ autenticado: true, usuario: { id: usuario.id, correo: usuario.correo, rol: usuario.rol }, token });
+    });
+  });
+});
+
 app.get('/api/usuarios', verifyToken, (req, res) => {
   if (req.usuario.rol !== 'admin') {
     return res.status(403).json({ mensaje: 'Acceso denegado' });
   }
   BD.query(
-    'SELECT id, correo, rol FROM usuarios',
+    'SELECT correo, rol FROM usuarios',
     (err, results) => {
       if (err) {
         console.error('▶️ Error en GET /api/usuarios:', err);
@@ -85,7 +132,6 @@ app.get('/api/usuarios', verifyToken, (req, res) => {
     }
   );
 });
-
 
 
 

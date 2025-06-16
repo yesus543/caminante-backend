@@ -211,6 +211,64 @@ app.get('/api/rutas', verifyToken, (req, res) => {
   });
 });
 
+
+// 11) Agregar nueva ruta (solo admin)
+app.post('/api/agregarRuta', verifyToken, (req, res) => {
+  // Sólo administradores
+  if (req.usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'Acceso denegado: solo administradores' });
+  }
+
+  const {
+    destino,
+    precio,
+    horarios,
+    direccion,
+    telefono,
+    horarioSucursal,
+    mapa
+  } = req.body;
+
+  // Validar obligatorios
+  if (!destino || precio == null || !horarios || !direccion) {
+    return res.status(400).json({ mensaje: 'Faltan datos obligatorios' });
+  }
+
+  // Convertir horarios a array de strings
+  const horariosArr = Array.isArray(horarios)
+    ? horarios
+    : horarios.split(',').map(h => h.trim());
+
+  // Insertar en la tabla 'rutas'
+  const sql = `
+    INSERT INTO rutas
+      (destino, precio, horarios, direccion, telefono, horarioSucursal, mapa)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `;
+  BD.query(
+    sql,
+    [
+      destino,
+      precio,                            // decimal(10,2)
+      JSON.stringify(horariosArr),       // longtext
+      direccion,                         // varchar(255)
+      telefono  || null,                 // varchar(20)
+      horarioSucursal || null,           // varchar(50)
+      mapa                              // text
+    ],
+    (err, result) => {
+      if (err) {
+        console.error('Error al agregar ruta:', err);
+        return res.status(500).json({ mensaje: 'Error interno al agregar ruta' });
+      }
+      res.status(201).json({
+        mensaje: 'Ruta agregada correctamente',
+        id: result.insertId
+      });
+    }
+  );
+});
+
 // 15) Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor iniciado en puerto ${PORT}`);

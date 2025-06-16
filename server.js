@@ -388,7 +388,35 @@ app.post('/api/rutas/:id/reservar', verifyToken, (req, res) => {
   });
 });
 
-
+// 16) Obtener reservas del usuario
+app.get('/api/mis-reservas', verifyToken, (req, res) => {
+  const usuarioId = req.usuario.id;
+  const sql = `
+    SELECT a.ruta_id AS rutaId,
+           r.destino,
+           a.fila,
+           a.columna,
+           r.precio
+    FROM asientos a
+    JOIN rutas r ON a.ruta_id = r.id
+    WHERE a.usuario_id = ? AND a.ocupado = 1
+  `;
+  BD.query(sql, [usuarioId], (err, results) => {
+    if (err) {
+      console.error('Error GET /api/mis-reservas:', err);
+      return res.status(500).json({ mensaje: 'Error al obtener tus reservas' });
+    }
+    // Mapear resultados
+    const reservas = results.map(r => ({
+      rutaId: r.rutaId,
+      destino: r.destino,
+      fila: r.fila,
+      columna: r.columna,
+      precio: r.precio
+    }));
+    res.json(reservas);
+  });
+});
 
 // 15) Iniciar servidor
 app.listen(PORT, () => {

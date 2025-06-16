@@ -387,8 +387,6 @@ app.post('/api/rutas/:id/reservar', verifyToken, (req, res) => {
     });
   });
 });
-
-// 16) Obtener reservas del usuario
 app.get('/api/mis-reservas', verifyToken, (req, res) => {
   const usuarioId = req.usuario.id;
   const sql = `
@@ -406,7 +404,6 @@ app.get('/api/mis-reservas', verifyToken, (req, res) => {
       console.error('Error GET /api/mis-reservas:', err);
       return res.status(500).json({ mensaje: 'Error al obtener tus reservas' });
     }
-    // Mapear resultados
     const reservas = results.map(r => ({
       rutaId: r.rutaId,
       destino: r.destino,
@@ -418,6 +415,36 @@ app.get('/api/mis-reservas', verifyToken, (req, res) => {
   });
 });
 
+// 17) Cancelar reserva (liberar asiento)
+app.delete('/api/mis-reservas/:rutaId/:fila/:columna', verifyToken, (req, res) => {
+  const usuarioId = req.usuario.id;
+  const { rutaId, fila, columna } = req.params;
+
+  // Verificar que la reserva pertenezca al usuario
+  const lookup = `
+    SELECT ocupado FROM asientos
+    WHERE ruta_id = ? AND fila = ? AND columna = ? AND usuario_id = ?
+  `;
+  BD.query(lookup, [rutaId, fila, columna, usuarioId], (err, rows) => {
+    if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    if (rows.length === 0) {
+      return res.status(404).json({ mensaje: 'Reserva no encontrada' });
+    }
+    // Liberar asiento
+    const update = `
+      UPDATE asientos
+      SET ocupado = 0, usuario_id = NULL
+      WHERE ruta_id = ? AND fila = ? AND columna = ?
+    `;
+    BD.query(update, [rutaId, fila, columna], err => {
+      if (err) {
+        console.error('Error DELETE /api/mis-reservas:', err);
+        return res.status(500).json({ mensaje: 'Error al cancelar reserva' });
+      }
+      res.json({ mensaje: 'Reserva cancelada correctamente' });
+    });
+  });
+});
 // 15) Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor iniciado en puerto ${PORT}`);

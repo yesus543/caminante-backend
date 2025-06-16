@@ -19,13 +19,13 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-const required = ['DB_HOST','DB_USER','DB_PASSWORD','DB_NAME','JWT_SECRET'];
-required.forEach(key => {
-  if (!process.env[key]) {
-    console.error(`FATAL ERROR: Falta la variable de entorno ${key}`);
+const requiredDB = ['DB_HOST','DB_USER','DB_PASSWORD','DB_NAME'];
+for (const v of requiredDB) {
+  if (!process.env[v]) {
+    console.error(`FATAL ERROR: ${v} no está definido.`);
     process.exit(1);
   }
-});
+}
 
 // 3) Middleware
 app.use(cors({

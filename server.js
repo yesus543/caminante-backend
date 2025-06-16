@@ -269,6 +269,66 @@ app.post('/api/agregarRuta', verifyToken, (req, res) => {
   );
 });
 
+// Modificar ruta (solo admin)
+app.put('/api/rutas/:id', verifyToken, (req, res) => {
+  // 1) Sólo admins
+  if (req.usuario.rol !== 'admin') {
+    return res.status(403).json({ mensaje: 'Acceso denegado: solo administradores' });
+  }
+
+  const { id } = req.params;
+  const {
+    destino,
+    precio,
+    horarios,
+    direccion,
+    telefono,
+    horarioSucursal,
+    mapa
+  } = req.body;
+
+  // 2) Validar campos obligatorios
+  if (!destino || precio == null || !horarios || !direccion) {
+    return res.status(400).json({ mensaje: 'Faltan datos obligatorios' });
+  }
+
+  // 3) Asegurarnos de que horarios sea un array
+  const horariosArr = Array.isArray(horarios)
+    ? horarios
+    : horarios.split(',').map(h => h.trim());
+
+  // 4) Ejecutar UPDATE
+  const sql = `
+    UPDATE rutas
+    SET destino = ?, precio = ?, horarios = ?, direccion = ?, telefono = ?, horarioSucursal = ?, mapa = ?
+    WHERE id = ?
+  `;
+  BD.query(
+    sql,
+    [
+      destino,
+      precio,
+      JSON.stringify(horariosArr),
+      direccion,
+      telefono  || null,
+      horarioSucursal || null,
+      mapa || null,
+      id
+    ],
+    (err, result) => {
+      if (err) {
+        console.error('Error al modificar ruta:', err);
+        return res.status(500).json({ mensaje: 'Error interno al modificar ruta' });
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ mensaje: 'Ruta no encontrada' });
+      }
+      res.json({ mensaje: 'Ruta actualizada correctamente' });
+    }
+  );
+});
+
+
 // 15) Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor iniciado en puerto ${PORT}`);

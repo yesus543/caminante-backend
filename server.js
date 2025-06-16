@@ -202,10 +202,18 @@ app.delete('/api/usuarios/:id/eliminar', verifyToken, (req, res) => {
 app.get('/api/rutas', verifyToken, (req, res) => {
   const sql = 'SELECT id, destino, precio, horarios, mapa FROM rutas';
   BD.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    if (err) {
+      console.error('Error en GET /api/rutas:', err);
+      return res.status(500).json({ mensaje: 'Error interno al obtener rutas' });
+    }
     const rutas = results.map(r => ({
-      ...r,
-      horarios: typeof r.horarios === 'string' ? JSON.parse(r.horarios) : r.horarios
+      id:       r.id,
+      destino:  r.destino,
+      precio:   r.precio,
+      horarios: typeof r.horarios === 'string'
+                 ? JSON.parse(r.horarios)
+                 : r.horarios,
+      mapa:     r.mapa
     }));
     res.json(rutas);
   });

@@ -335,6 +335,56 @@ app.put('/api/rutas/:id', verifyToken, (req, res) => {
     }
   );
 });
+// 16) Obtener asientos disponibles para una ruta (sala de asientos)
+app.get('/api/rutas/:id/asientos', verifyToken, (req, res) => {
+  const { id } = req.params;
+  // Sólo usuarios autenticados
+  const sql = 'SELECT fila, columna, ocupado FROM asientos WHERE ruta_id = ?';
+  BD.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error('Error GET /api/rutas/:id/asientos:', err);
+      return res.status(500).json({ mensaje: 'Error al obtener asientos' });
+    }
+    // Formatear matriz de asientos
+    const asientoMap = {};
+    results.forEach(({ fila, columna, ocupado }) => {
+      asientoMap[`${fila}-${columna}`] = ocupado;
+    });
+    res.json({ asientos: asientoMap });
+  });
+});
+
+// 17) Reservar un asiento en una ruta
+app.post('/api/rutas/:id/reservar', verifyToken, (req, res) => {
+  const { id } = req.params;
+  const { fila, columna } = req.body;
+  const usuarioId = req.usuario.id;
+
+  if (fila == null || columna == null) {
+    return res.status(400).json({ mensaje: 'Faltan datos de asiento' });
+  }
+
+  // Verificar que no esté ocupado
+  const checkSql = 'SELECT ocupado FROM asientos WHERE ruta_id = ? AND fila = ? AND columna = ?';
+  BD.query(checkSql, [id, fila, columna], (err, rows) => {
+    if (err) return res.status(500).json({ mensaje: 'Error interno' });
+    if (rows.length === 0) {
+      return res.status(404).json({ mensaje: 'Asiento no existe' });
+    }
+    if (rows[0].ocupado) {
+      return res.status(409).json({ mensaje: 'Asiento ya reservado' });
+    }
+    // Marcar como ocupado y registrar reserva
+    const updateSql = 'UPDATE asientos SET ocupado = 1, usuario_id = ? WHERE ruta_id = ? AND fila = ? AND columna = ?';
+    BD.query(updateSql, [usuarioId, id, fila, columna], (err) => {
+      if (err) {
+        console.error('Error reservar asiento:', err);
+        return res.status(500).json({ mensaje: 'Error al reservar asiento' });
+      }
+      res.json({ mensaje: 'Asiento reservado correctamente', fila, columna });
+    });
+  });
+});
 
 
 // 15) Iniciar servidor

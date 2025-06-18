@@ -142,6 +142,7 @@ app.post('/api/login', (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ mensaje: 'Faltan datos' });
   }
+
   BD.query('SELECT * FROM usuarios WHERE correo = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ mensaje: 'Error interno' });
     if (results.length === 0) {
@@ -151,36 +152,20 @@ app.post('/api/login', (req, res) => {
     bcrypt.compare(password, usuario.contrasena, (err, match) => {
       if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
       if (!match) return res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
+
+      // Generar el token JWT
       const token = jwt.sign({ id: usuario.id, rol: usuario.rol }, JWT_SECRET, { expiresIn: '1h' });
 
-      // Aquí decides la URL según el rol:
-      let redirectUrl = '';
-      switch (usuario.rol) {
-        case 'admin':
-          redirectUrl = '/admin/dashboard';
-          break;
-        case 'supervisor':
-          redirectUrl = '/supervisor/home';
-          break;
-        case 'taquillero':
-          redirectUrl = '/taquillero/inicio';
-          break;
-        case 'volantero':
-          redirectUrl = '/volantero/inicio';
-          break;
-        default:
-          redirectUrl = '/';
-      }
-
+      // Aquí no es necesario cambiar nada si solo necesitas enviar el rol
       res.json({
         autenticado: true,
         usuario: { id: usuario.id, correo: usuario.correo, rol: usuario.rol },
         token,
-        redirectUrl
       });
     });
   });
 });
+
 
 // 10) Obtener usuarios (solo admin)
 app.get('/api/usuarios', verifyToken, (req, res) => {

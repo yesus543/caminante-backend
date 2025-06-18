@@ -494,6 +494,75 @@ app.delete('/api/mis-reservas/:rutaId/:fila/:columna', verifyToken, (req, res) =
     });
   });
 });
+
+
+// Endpoint para registrar venta de volantero
+app.post('/api/volantero/registrar-venta', verifyToken, (req, res) => {
+  // Verificar que el usuario es volantero
+  if (req.usuario.rol !== 'volantero') {
+    return res.status(403).json({ mensaje: 'Acceso denegado: solo volanteros' });
+  }
+
+  const { boletos_vendidos, boletos_devueltos } = req.body;
+  
+  if (boletos_vendidos === undefined || boletos_devueltos === undefined) {
+    return res.status(400).json({ mensaje: 'Faltan datos obligatorios' });
+  }
+
+  if (boletos_vendidos < 0 || boletos_devueltos < 0) {
+    return res.status(400).json({ mensaje: 'Los valores no pueden ser negativos' });
+  }
+
+  const sql = `
+    INSERT INTO ventas_volantero 
+    (volantero_id, boletos_vendidos, boletos_devueltos, fecha)
+    VALUES (?, ?, ?, NOW())
+  `;
+  
+  BD.query(
+    sql,
+    [req.usuario.id, boletos_vendidos, boletos_devueltos],
+    (err, result) => {
+      if (err) {
+        console.error('Error al registrar venta:', err);
+        return res.status(500).json({ mensaje: 'Error al registrar venta' });
+      }
+      res.status(201).json({ 
+        mensaje: 'Venta registrada correctamente',
+        id: result.insertId
+      });
+    }
+  );
+});
+
+// Endpoint para obtener historial de ventas del volantero
+app.get('/api/volantero/historial', verifyToken, (req, res) => {
+  // Verificar que el usuario es volantero
+  if (req.usuario.rol !== 'volantero') {
+    return res.status(403).json({ mensaje: 'Acceso denegado: solo volanteros' });
+  }
+
+  const sql = `
+    SELECT 
+      id,
+      boletos_vendidos,
+      boletos_devueltos,
+      DATE_FORMAT(fecha, '%Y-%m-%d %H:%i:%s') as fecha
+    FROM ventas_volantero
+    WHERE volantero_id = ?
+    ORDER BY fecha DESC
+  `;
+  
+  BD.query(sql, [req.usuario.id], (err, results) => {
+    if (err) {
+      console.error('Error al obtener historial:', err);
+      return res.status(500).json({ mensaje: 'Error al obtener historial' });
+    }
+    res.json(results);
+  });
+});
+
+
 // 15) Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor iniciado en puerto ${PORT}`);

@@ -137,7 +137,6 @@ app.post('/api/registroAdmin', verifyToken, (req, res) => {
   });
 });
 
-// 9) Login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -153,7 +152,32 @@ app.post('/api/login', (req, res) => {
       if (err) return res.status(500).json({ mensaje: 'Error al comparar contraseñas' });
       if (!match) return res.status(401).json({ autenticado: false, mensaje: 'Contraseña incorrecta' });
       const token = jwt.sign({ id: usuario.id, rol: usuario.rol }, JWT_SECRET, { expiresIn: '1h' });
-      res.json({ autenticado: true, usuario: { id: usuario.id, correo: usuario.correo, rol: usuario.rol }, token });
+
+      // Aquí decides la URL según el rol:
+      let redirectUrl = '';
+      switch (usuario.rol) {
+        case 'admin':
+          redirectUrl = '/admin/dashboard';
+          break;
+        case 'supervisor':
+          redirectUrl = '/supervisor/home';
+          break;
+        case 'taquillero':
+          redirectUrl = '/taquillero/inicio';
+          break;
+        case 'volantero':
+          redirectUrl = '/volantero/inicio';
+          break;
+        default:
+          redirectUrl = '/';
+      }
+
+      res.json({
+        autenticado: true,
+        usuario: { id: usuario.id, correo: usuario.correo, rol: usuario.rol },
+        token,
+        redirectUrl
+      });
     });
   });
 });

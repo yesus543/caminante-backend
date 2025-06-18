@@ -223,7 +223,7 @@ app.put('/api/usuarios/:id/modificar-rol', verifyToken, (req, res) => {
   if (req.usuario.rol !== 'admin') {
     return res.status(403).json({ mensaje: 'Acceso denegado' });
   }
-  if (!['admin', 'usuario'].includes(rol)) {
+  if (!['admin', 'usuario','taquillero', 'volantero'].includes(rol)) {
     return res.status(400).json({ mensaje: 'Rol inválido' });
   }
   BD.query('UPDATE usuarios SET rol = ? WHERE id = ?', [rol, id], (err) => {

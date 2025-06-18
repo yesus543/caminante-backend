@@ -109,33 +109,48 @@ app.post('/api/registroUSER', (req, res) => {
   });
 });
 
-// 8) Registro de administrador (solo admin)
-app.post('/api/registroAdmin', verifyToken, (req, res) => {
+// 8) Registro de nuevo usuario (incluyendo taquillero y volantero)
+app.post('/api/registroUsuario', verifyToken, (req, res) => {
+  // Verificamos si el rol del usuario autenticado es admin
   if (req.usuario.rol !== 'admin') {
     return res.status(403).json({ mensaje: 'Acceso denegado: solo administradores' });
   }
-  const { email, password } = req.body;
-  if (!email || !password) {
+
+  const { email, password, rol } = req.body;
+  
+  // Verificamos que el rol esté permitido
+  if (!['taquillero', 'volantero'].includes(rol)) {
+    return res.status(400).json({ mensaje: 'Rol inválido. Solo taquillero o volantero son permitidos.' });
+  }
+
+  if (!email || !password || !rol) {
     return res.status(400).json({ mensaje: 'Faltan datos' });
   }
+
+  // Verificamos si el correo ya está registrado
   BD.query('SELECT id FROM usuarios WHERE correo = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ mensaje: 'Error interno' });
     if (results.length > 0) {
       return res.status(409).json({ mensaje: 'Correo ya registrado' });
     }
+
+    // Hash de la contraseña antes de guardarla
     bcrypt.hash(password, 10, (err, hash) => {
       if (err) return res.status(500).json({ mensaje: 'Error al procesar contraseña' });
+      
+      // Insertamos el nuevo usuario con el rol seleccionado (taquillero o volantero)
       BD.query(
         'INSERT INTO usuarios (correo, contrasena, rol) VALUES (?, ?, ?)',
-        [email, hash, 'admin'],
+        [email, hash, rol],
         err => {
-          if (err) return res.status(500).json({ mensaje: 'Error al registrar administrador' });
-          res.status(201).json({ mensaje: 'Administrador registrado correctamente' });
+          if (err) return res.status(500).json({ mensaje: 'Error al registrar usuario' });
+          res.status(201).json({ mensaje: `Usuario registrado correctamente como ${rol}` });
         }
       );
     });
   });
 });
+
 
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
